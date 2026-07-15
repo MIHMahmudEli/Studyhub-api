@@ -66,7 +66,7 @@ export class AuthService {
     };
   }
 
-  async verifyEmail(verifyEmailDto: VerifyEmailDto) {
+  async verifyEmail(verifyEmailDto: VerifyEmailDto, req: Express.Request, res: Express.Response) {
     const pendingUser = await this.pendingUserRepository.findOne({ where: { email: verifyEmailDto.email } });
 
     if (!pendingUser || pendingUser.otp !== verifyEmailDto.otp) {
@@ -88,7 +88,29 @@ export class AuthService {
 
     await this.pendingUserRepository.remove(pendingUser);
 
-    return { message: 'Email verified successfully. Your account is now active.' };
+    const payload = { sub: user.id, email: user.email, role: user.role };
+    const access_token = this.tokenService.generateAccessToken(payload);
+    const refresh_token = this.tokenService.generateRefreshToken(payload);
+
+    await this.sessionService.create(user.id, refresh_token, req.get('user-agent'), req.ip);
+    await this.activityService.updateLastActive(user.id);
+    this.tokenService.setRefreshTokenCookie(res, refresh_token, req);
+
+    return {
+      access_token,
+      refresh_token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        dept: user.dept,
+        code: user.code,
+        profile_pic: user.profile_pic,
+        points: user.points,
+        preferred_theme: user.preferred_theme,
+      },
+    };
   }
 
   async login(loginDto: LoginDto, req: Express.Request, res: Express.Response) {

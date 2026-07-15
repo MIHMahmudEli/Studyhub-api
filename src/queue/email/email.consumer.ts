@@ -9,19 +9,24 @@ export class EmailConsumer extends WorkerHost {
   }
 
   async process(job: Job): Promise<void> {
-    switch (job.name) {
-      case 'send-verification': {
-        const { to, name, otp } = job.data;
-        await this.mailService.sendVerificationEmail(to, name, otp);
-        break;
+    try {
+      switch (job.name) {
+        case 'send-verification': {
+          const { to, name, otp } = job.data;
+          await this.mailService.sendVerificationEmail(to, name, otp);
+          break;
+        }
+        case 'send-password-reset': {
+          const { to, name, otp } = job.data;
+          await this.mailService.sendPasswordResetEmail(to, name, otp);
+          break;
+        }
+        default:
+          console.warn(`[Queue] Unknown email job: ${job.name}`);
       }
-      case 'send-password-reset': {
-        const { to, name, otp } = job.data;
-        await this.mailService.sendPasswordResetEmail(to, name, otp);
-        break;
-      }
-      default:
-        console.warn(`[Queue] Unknown email job: ${job.name}`);
+    } catch (error) {
+      console.error(`[EmailConsumer] Job ${job.id} (${job.name}) failed:`, error);
+      throw error;
     }
   }
 }
